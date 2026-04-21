@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRouter from './routes.js';
-
+import { apiKeyAuth } from '../middleware/auth.js';
 dotenv.config();
 
 const app = express();
@@ -10,7 +10,7 @@ const port = parseInt(process.env.PORT || '4000', 10);
 
 app.use(cors({ origin: true }));
 app.use(express.json());
-app.use('/api', apiRouter);
+app.use('/api',apiKeyAuth, apiRouter);
 
 app.get('/', (_req, res) => {
   res.json({ message: 'Product Inventory Backend is running' });

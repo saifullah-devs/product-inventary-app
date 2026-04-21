@@ -18,3 +18,4 @@ if (serviceAccountJson) {
 
 export const db = admin.firestore();
 export const adminApp = admin;
+db.settings({ ignoreUndefinedProperties: true });
