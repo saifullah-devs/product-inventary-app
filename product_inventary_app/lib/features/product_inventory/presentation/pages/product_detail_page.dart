@@ -1,278 +1,365 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../domain/entities/product.dart';
+import 'package:intl/intl.dart';
+
 import '../bloc/product_bloc.dart';
+import '../../domain/entities/product.dart';
 
 class ProductDetailPage extends StatefulWidget {
-  final Product product;
+  final String productId; // Now accepts ONLY the ID
 
-  const ProductDetailPage({super.key, required this.product});
+  const ProductDetailPage({super.key, required this.productId});
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
 }
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
-  final _formKey = GlobalKey<FormState>();
-
-  late TextEditingController _nameCtrl;
-  late TextEditingController _descCtrl;
-  late TextEditingController _categoryCtrl;
-  late TextEditingController _basePriceCtrl;
-  late TextEditingController _comparePriceCtrl;
-
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: widget.product.name);
-    _descCtrl = TextEditingController(text: widget.product.description);
-    _categoryCtrl = TextEditingController(text: widget.product.category);
-    _basePriceCtrl = TextEditingController(
-      text: widget.product.basePrice.toString(),
-    );
-    _comparePriceCtrl = TextEditingController(
-      text: widget.product.baseComparePrice.toString(),
-    );
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
-    _categoryCtrl.dispose();
-    _basePriceCtrl.dispose();
-    _comparePriceCtrl.dispose();
-    super.dispose();
-  }
-
-  void _onUpdate() {
-    if (_formKey.currentState!.validate()) {
-      // Reconstruct the entity with updated form values
-      final updatedProduct = Product(
-        id: widget.product.id,
-        images: widget.product.images,
-        name: _nameCtrl.text.trim(),
-        description: _descCtrl.text.trim(),
-        category: _categoryCtrl.text.trim(),
-        basePrice: double.tryParse(_basePriceCtrl.text) ?? 0.0,
-        baseComparePrice: double.tryParse(_comparePriceCtrl.text) ?? 0.0,
-        variants: widget.product.variants, // Keeping existing variants for now
-      );
-
-      context.read<ProductBloc>().add(UpdateProductEvent(updatedProduct));
-      Navigator.pop(context);
-    }
-  }
-
-  void _confirmDelete() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Delete Product"),
-        content: Text(
-          "Are you sure you want to delete '${widget.product.name}'? This cannot be undone.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              context.read<ProductBloc>().add(
-                DeleteProductEvent(widget.product.id),
-              );
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-            },
-            child: const Text("Delete", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+    context.read<ProductBloc>().add(GetProductDetailEvent(widget.productId));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Product'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
-            onPressed: _confirmDelete,
-            tooltip: "Delete Product",
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildImageGallery(),
-              const SizedBox(height: 24),
-              _buildSectionTitle("General Information"),
-              _buildTextField(_nameCtrl, "Product Name"),
-              _buildTextField(_categoryCtrl, "Category"),
-              _buildTextField(_descCtrl, "Description", maxLines: 3),
-              const SizedBox(height: 24),
-              _buildSectionTitle("Pricing"),
-              Row(
+      body: BlocBuilder<ProductBloc, ProductState>(
+        builder: (context, state) {
+          if (state is ProductLoading || state is ProductInitial) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state is ProductError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: _buildTextField(
-                      _basePriceCtrl,
-                      "Base Price",
-                      isNumber: true,
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(state.message),
+                  TextButton(
+                    onPressed: () => context.read<ProductBloc>().add(
+                      GetProductDetailEvent(widget.productId),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      _comparePriceCtrl,
-                      "Compare Price",
-                      isNumber: true,
-                    ),
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              _buildSectionTitle(
-                "Variants (${widget.product.variants.length})",
-              ),
-              _buildVariantsList(),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _onUpdate,
-                  child: const Text(
-                    "Save Changes",
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+            );
+          }
 
-  Widget _buildImageGallery() {
-    if (widget.product.images.isEmpty) return const SizedBox();
-    return SizedBox(
-      height: 100,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: widget.product.images.length,
-        itemBuilder: (context, index) {
-          return Container(
-            margin: const EdgeInsets.only(right: 8),
-            width: 100,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-              image: DecorationImage(
-                image: NetworkImage(widget.product.images[index]),
-                fit: BoxFit.cover,
-              ),
-            ),
-          );
+          if (state is ProductDetailLoaded) {
+            return _buildDetailContent(context, state.product);
+          }
+
+          return const SizedBox();
         },
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.blueGrey,
-        ),
-      ),
-    );
-  }
+  // Extracted the UI logic here to keep the build method clean
+  Widget _buildDetailContent(BuildContext context, Product product) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
-  Widget _buildTextField(
-    TextEditingController ctrl,
-    String label, {
-    int maxLines = 1,
-    bool isNumber = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: TextFormField(
-        controller: ctrl,
-        maxLines: maxLines,
-        keyboardType: isNumber
-            ? const TextInputType.numberWithOptions(decimal: true)
-            : TextInputType.text,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          filled: true,
-          fillColor: Colors.grey.shade50,
-        ),
-        validator: (val) =>
-            val == null || val.isEmpty ? "Required field" : null,
-      ),
+    final currencyFormat = NumberFormat.currency(
+      symbol: '\$',
+      decimalDigits: 2,
     );
-  }
+    final dateFormat = DateFormat.yMMMMd().add_jm();
 
-  Widget _buildVariantsList() {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: widget.product.variants.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final variant = widget.product.variants[index];
-        return Card(
-          elevation: 0,
-          color: Colors.grey.shade100,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: Colors.grey.shade300),
-          ),
-          child: ListTile(
-            title: Text(
-              "SKU: ${variant.sku}",
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              "Attributes: ${variant.attributes.entries.map((e) => '${e.key}: ${e.value}').join(', ')}",
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  "\$${variant.price}",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
+    // Check if there is an active discount
+    final hasDiscount =
+        product.comparePrice != null && product.comparePrice! > product.price;
+
+    return Column(
+      children: [
+        Expanded(
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight:
+                    300.0, // Slightly taller to accommodate real images beautifully
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    color: colorScheme.surfaceContainerHighest,
+                    // Hero widget matches the one in the ProductCard
+                    child: Hero(
+                      tag: 'product_icon_${product.id}',
+                      child: product.imageUrl.isNotEmpty
+                          ? Image.network(
+                              product.imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Center(
+                                    child: Icon(
+                                      Icons.broken_image_rounded,
+                                      size: 100,
+                                      color: colorScheme.primary.withValues(
+                                        alpha: .5,
+                                      ),
+                                    ),
+                                  ),
+                            )
+                          : Center(
+                              child: Icon(
+                                Icons.inventory_2_rounded,
+                                size: 100,
+                                color: colorScheme.primary.withValues(
+                                  alpha: .5,
+                                ),
+                              ),
+                            ),
+                    ),
                   ),
                 ),
-                Text(
-                  "Stock: ${variant.stockQuantity}",
-                  style: const TextStyle(fontSize: 12),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- Category ---
+                      Text(
+                        product.category.toUpperCase(),
+                        style: textTheme.labelMedium?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // --- Title & Stock Badge ---
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              product.name,
+                              style: textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          _buildStockBadge(context, product.stockQuantity),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // --- Price & Compare Price ---
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            currencyFormat.format(product.price),
+                            style: textTheme.displaySmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: hasDiscount
+                                  ? colorScheme.error
+                                  : colorScheme.primary,
+                            ),
+                          ),
+                          if (hasDiscount) ...[
+                            const SizedBox(width: 12),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6.0),
+                              child: Text(
+                                currencyFormat.format(product.comparePrice),
+                                style: textTheme.headlineSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
+                      // --- Description ---
+                      Text(
+                        'Description',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        product.description,
+                        style: textTheme.bodyLarge?.copyWith(
+                          height: 1.5,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const Divider(height: 64),
+
+                      // --- System Information ---
+                      Text(
+                        'System Information',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Added SKU to metadata
+                      _buildMetadataRow(
+                        context,
+                        icon: Icons.qr_code_2,
+                        label: 'SKU',
+                        value: product.sku,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMetadataRow(
+                        context,
+                        icon: Icons.fingerprint,
+                        label: 'Product ID',
+                        value: product.id,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMetadataRow(
+                        context,
+                        icon: Icons.calendar_today_outlined,
+                        label: 'Created At',
+                        value: dateFormat.format(product.createdAt),
+                      ),
+                      const SizedBox(
+                        height: 40,
+                      ), // Extra padding for scroll clearance
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+
+        // --- Bottom Action Bar ---
+        BottomAppBar(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _confirmDelete(context, product),
+                icon: Icon(Icons.delete_outline, color: colorScheme.error),
+                label: Text(
+                  'Delete',
+                  style: TextStyle(color: colorScheme.error),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: colorScheme.error),
+                ),
+              ),
+              const Spacer(),
+              FilledButton.icon(
+                onPressed: () {
+                  // Navigate to Edit page
+                },
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Edit Product'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStockBadge(BuildContext context, int stockQuantity) {
+    final theme = Theme.of(context);
+    Color badgeColor = stockQuantity > 10
+        ? Colors.green
+        : (stockQuantity > 0 ? Colors.orange : theme.colorScheme.error);
+    String badgeText = stockQuantity > 10
+        ? 'In Stock ($stockQuantity)'
+        : (stockQuantity > 0 ? 'Low Stock ($stockQuantity)' : 'Out of Stock');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+      decoration: BoxDecoration(
+        color: badgeColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        badgeText,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: badgeColor,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetadataRow(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Text(
+          '$label:',
+          style: TextStyle(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Product product) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Product'),
+        content: Text(
+          'Are you sure you want to permanently delete "${product.name}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<ProductBloc>().add(DeleteProductEvent(product.id));
+              Navigator.pop(context);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 }

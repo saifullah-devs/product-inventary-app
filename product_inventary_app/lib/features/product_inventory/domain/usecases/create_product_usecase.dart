@@ -1,7 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:product_inventary_app/core/error/failures.dart';
-import 'package:product_inventary_app/core/usecase/usecase.dart';
-
+import 'package:product_inventary_app/core/usecases/usecase.dart';
 import '../entities/product.dart';
 import '../repositories/product_repository.dart';
 

@@ -5,7 +5,10 @@ import '../error/exceptions.dart';
 
 class NetworkClient {
   final http.Client _client;
-
+  static const String myApiKey = String.fromEnvironment(
+    'API_KEY',
+    defaultValue: '',
+  );
   NetworkClient(this._client);
 
   Future<dynamic> request({
@@ -24,6 +27,7 @@ class NetworkClient {
     final Map<String, String> requestHeaders = {
       HttpHeaders.contentTypeHeader: 'application/json',
       HttpHeaders.acceptHeader: 'application/json',
+      'X-API-KEY': myApiKey,
       ...?headers,
     };
 

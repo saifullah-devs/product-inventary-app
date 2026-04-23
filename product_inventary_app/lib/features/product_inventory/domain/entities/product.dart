@@ -1,44 +1,41 @@
 import 'package:equatable/equatable.dart';
-import 'product_variant.dart';
 
 class Product extends Equatable {
   final String id;
-  final List<String> images;
   final String name;
   final String description;
+  final double price;
+  final double? comparePrice; // Nullable: Only exists if there's a discount/RRP
+  final int stockQuantity;
+  final String sku; // Stock Keeping Unit (e.g., "TSHIRT-BLK-M")
   final String category;
-  final double basePrice;
-  final double baseComparePrice;
-  final List<ProductVariant> variants;
+  final String imageUrl; // Single image representation
+  final DateTime createdAt;
 
   const Product({
     required this.id,
-    required this.images,
     required this.name,
     required this.description,
+    required this.price,
+    this.comparePrice,
+    required this.stockQuantity,
+    required this.sku,
     required this.category,
-    required this.basePrice,
-    required this.baseComparePrice,
-    required this.variants,
+    required this.imageUrl,
+    required this.createdAt,
   });
-
-  String get priceRange {
-    if (variants.isEmpty) return "$basePrice";
-    final prices = variants.map((v) => v.price).toList();
-    final minPrice = prices.reduce((a, b) => a < b ? a : b);
-    final maxPrice = prices.reduce((a, b) => a > b ? a : b);
-    return minPrice == maxPrice ? "$minPrice" : "$minPrice - $maxPrice";
-  }
 
   @override
   List<Object?> get props => [
     id,
-    images,
     name,
     description,
+    price,
+    comparePrice,
+    stockQuantity,
+    sku,
     category,
-    basePrice,
-    baseComparePrice,
-    variants,
+    imageUrl,
+    createdAt,
   ];
 }

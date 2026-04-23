@@ -1,3 +1,4 @@
+import 'package:product_inventary_app/core/constants/app_url.dart';
 import 'package:product_inventary_app/core/network/network_service.dart';
 
 import '../models/product_model.dart';
@@ -9,16 +10,25 @@ class RestProductDataSource implements IProductDataSource {
   RestProductDataSource({required this.network});
 
   @override
-  Future<List<ProductModel>> getAllProducts() async {
-    final response = await network.request(path: '/products', method: 'GET');
+  Future<List<ProductModel>> getAllProducts({
+    required int limit,
+    required int offset,
+  }) async {
+    final response = await network.request(
+      path: AppUrl.productsEndpoint,
+      method: 'GET',
+      queryParameters: {'limit': limit, 'offset': offset},
+    );
+
     return (response as List).map((e) => ProductModel.fromJson(e)).toList();
   }
 
   @override
   Future<ProductModel> getProduct(String id) async {
     final response = await network.request(
-      path: '/products/$id',
+      path: AppUrl.productsEndpoint,
       method: 'GET',
+      queryParameters: {'id': id},
     );
     return ProductModel.fromJson(response);
   }
@@ -26,7 +36,7 @@ class RestProductDataSource implements IProductDataSource {
   @override
   Future<void> addProduct(ProductModel product) async {
     await network.request(
-      path: '/products',
+      path: AppUrl.productsEndpoint,
       method: 'POST',
       body: product.toJson(),
     );
@@ -35,7 +45,7 @@ class RestProductDataSource implements IProductDataSource {
   @override
   Future<void> updateProduct(ProductModel product) async {
     await network.request(
-      path: '/products/${product.id}',
+      path: '${AppUrl.productsEndpoint}/${product.id}',
       method: 'PUT',
       body: product.toJson(),
     );
@@ -43,23 +53,29 @@ class RestProductDataSource implements IProductDataSource {
 
   @override
   Future<void> deleteProduct(String id) async {
-    await network.request(path: '/products/$id', method: 'DELETE');
+    await network.request(
+      path: '${AppUrl.productsEndpoint}/$id',
+      method: 'DELETE',
+    );
   }
 
-  /// Industrial Batch Operations
   @override
   Future<void> addAll(List<ProductModel> products) async {
-    // Standard approach: Send a list to a bulk endpoint
     await network.request(
-      path: '/products/bulk',
+      path: '${AppUrl.productsEndpoint}/bulk',
       method: 'POST',
       body: products.map((p) => p.toJson()).toList(),
     );
   }
 
   @override
-  Future<void> deleteAll() async {
-    // Caution: Usually requires high-level permissions
-    // await network.request(path: '/products', method: 'DELETE');
+  Future<void> deleteAllWithId(List<String> ids) async {
+    if (ids.isEmpty) return;
+
+    await network.request(
+      path: AppUrl.productsBulkEndpoint,
+      method: 'DELETE',
+      body: {'ids': ids},
+    );
   }
 }

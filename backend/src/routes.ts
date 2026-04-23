@@ -1,245 +1,144 @@
-﻿import { Router } from 'express';
+﻿import { Router, Request, Response } from 'express';
 import admin from 'firebase-admin';
 import { db } from './firebase.js';
 
 const router = Router();
-
+const productRef = db.collection('products');
 const serverTimestamp = () => admin.firestore.FieldValue.serverTimestamp();
 
-const parsePagination = (req: any) => ({
-  limit: Number(req.query.limit || 20),
-  lastId: String(req.query.lastId || ''),
-  sortKey: String(req.query.sortKey || 'createdAt'),
-  sortDir: (String(req.query.sortDir || 'desc') as 'asc' | 'desc')
-});
+const formatProduct = (doc: admin.firestore.DocumentSnapshot) => {
+    const data = doc.data();
+    if (!data) return null;
 
-const toJson = (snapshot: any) => snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-
-const createEntityRoutes = (name: string, uniqueFields: string[] = []) => {
-  const collectionRef = db.collection(name);
-
-  router.get(`/${name}`, async (req, res) => {
-    try {
-      const search = String(req.query.search || '').trim();
-      const { limit, lastId, sortKey, sortDir } = parsePagination(req);
-      let q: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = collectionRef;
-
-      if (search) {
-        q = q.where('name', '>=', search).where('name', '<=', `${search}\uf8ff`);
-      }
-
-      q = q.orderBy(sortKey, sortDir).limit(limit);
-
-      if (lastId) {
-        const cursorDoc = await collectionRef.doc(lastId).get();
-        if (cursorDoc.exists) {
-          q = q.startAfter(cursorDoc);
-        }
-      }
-
-      const snapshot = await q.get();
-      res.json({ data: toJson(snapshot) });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch records', details: error instanceof Error ? error.message : null });
-    }
-  });
-
-  router.post(`/${name}`, async (req, res) => {
-    try {
-      const data = { ...req.body, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
-
-      if (uniqueFields.length > 0) {
-        const duplicateChecks = await Promise.all(
-          uniqueFields.map((field) => collectionRef.where(field, '==', req.body[field]).get())
-        );
-
-        if (duplicateChecks.some((snap) => !snap.empty)) {
-          return res.status(409).json({ error: `${name} with the same ${uniqueFields.join(' or ')} already exists` });
-        }
-      }
-
-      const docRef = await collectionRef.add(data);
-      const created = await docRef.get();
-      res.status(201).json({ id: docRef.id, ...created.data() });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to create record', details: error instanceof Error ? error.message : null });
-    }
-  });
-
-  router.get(`/${name}/:id`, async (req, res) => {
-    try {
-      const snapshot = await collectionRef.doc(req.params.id).get();
-      if (!snapshot.exists) return res.status(404).json({ error: 'Record not found' });
-      res.json({ id: snapshot.id, ...snapshot.data() });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch record', details: error instanceof Error ? error.message : null });
-    }
-  });
-
-  router.put(`/${name}/:id`, async (req, res) => {
-    try {
-      const docRef = collectionRef.doc(req.params.id);
-      const snapshot = await docRef.get();
-      if (!snapshot.exists) return res.status(404).json({ error: 'Record not found' });
-
-      await docRef.update({ ...req.body, updatedAt: serverTimestamp() });
-      const updated = await docRef.get();
-      res.json({ id: updated.id, ...updated.data() });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to update record', details: error instanceof Error ? error.message : null });
-    }
-  });
-
-  router.delete(`/${name}/:id`, async (req, res) => {
-    try {
-      const docRef = collectionRef.doc(req.params.id);
-      const snapshot = await docRef.get();
-      if (!snapshot.exists) return res.status(404).json({ error: 'Record not found' });
-
-      await docRef.delete();
-      res.status(204).end();
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to delete record', details: error instanceof Error ? error.message : null });
-    }
-  });
+    return {
+        id: doc.id,
+        ...data,
+        created_at: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+        stock_quantity: data.stock_quantity || data.stockQuantity,
+        compare_price: data.compare_price || data.comparePrice,
+    };
 };
 
-createEntityRoutes('categories', ['name', 'slug']);
-createEntityRoutes('products', ['sku']);
-createEntityRoutes('partners', ['email']);
-createEntityRoutes('units', ['name', 'symbol']);
+// --- API ROUTES ---
 
-router.post('/auth/check', async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ isAdmin: false, error: 'Email is required' });
+// GET: Fetch all products (with pagination) OR single product (via ?id= query)
+router.get('/products', async (req: Request, res: Response) => {
+    try {
+        const { id, limit, offset } = req.query;
 
-    const normalizedEmail = String(email).toLowerCase().trim();
-    const adminSnapshot = await db.collection('admins').where('email', '==', normalizedEmail).get();
+        if (id && typeof id === 'string') {
+            const doc = await productRef.doc(id).get();
+            if (!doc.exists) return res.status(404).json({ error: 'Product not found' });
+            return res.json(formatProduct(doc));
+        }
 
-    res.json({ isAdmin: !adminSnapshot.empty });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed auth check', details: error instanceof Error ? error.message : null });
-  }
+        // 2. Handle getAllProducts(limit, offset)
+        const qLimit = parseInt(limit as string) || 20;
+        const qOffset = parseInt(offset as string) || 0;
+
+        const snapshot = await productRef
+            .orderBy('createdAt', 'desc')
+            .limit(qLimit)
+            .offset(qOffset)
+            .get();
+
+        const products = snapshot.docs.map(doc => formatProduct(doc));
+        
+        res.json(products);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-router.get('/stats', async (_req, res) => {
-  try {
-    const snapshot = await db.collection('system').doc('stats').get();
-    res.json(snapshot.exists ? snapshot.data() : {
-      totalBuyerEntries: 0,
-      totalBuyers: 0,
-      totalCategories: 0,
-      totalCustomerEntries: 0,
-      totalCustomers: 0,
-      totalProducts: 0,
-      totalStockEntries: 0,
-      totalSupplierEntries: 0,
-      totalSuppliers: 0
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch stats', details: error instanceof Error ? error.message : null });
-  }
+// POST: Add single product
+router.post('/products', async (req: Request, res: Response) => {
+    try {
+        const docRef = productRef.doc();
+        
+        const data = {
+            ...req.body,
+            id: docRef.id,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
+        
+        await docRef.set(data);
+        
+        const snapshot = await docRef.get();
+        res.status(201).json(formatProduct(snapshot));
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-router.get('/partner-entries', async (req, res) => {
-  try {
-    const limit = Number(req.query.limit || 20);
-    const snapshot = await db.collection('partnerEntries').limit(limit).get();
-    res.json({ data: toJson(snapshot) });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partner entries', details: error instanceof Error ? error.message : null });
-  }
+// POST: Bulk Add (addAll)
+router.post('/products/bulk', async (req: Request, res: Response) => {
+    try {
+        const batch = db.batch();
+        const productsList = req.body as any[];
+
+        productsList.forEach((item) => {
+            const docRef = productRef.doc(); 
+            
+            batch.set(docRef, {
+                ...item,
+                id: docRef.id,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+        });
+
+        await batch.commit();
+        res.status(201).send();
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-router.post('/partner-entries', async (req, res) => {
-  try {
-    const docRef = await db.collection('partnerEntries').add({
-      ...req.body,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    const snapshot = await docRef.get();
-    res.status(201).json({ id: docRef.id, ...snapshot.data() });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create partner entry', details: error instanceof Error ? error.message : null });
-  }
+// PUT: Update Product
+router.put('/products/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const docRef = productRef.doc(id);
+        
+        await docRef.update({
+            ...req.body,
+            updatedAt: serverTimestamp()
+        });
+
+        const updated = await docRef.get();
+        res.json(formatProduct(updated));
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-router.get('/partner-entries/:id', async (req, res) => {
-  try {
-    const snapshot = await db.collection('partnerEntries').doc(req.params.id).get();
-    if (!snapshot.exists) return res.status(404).json({ error: 'Entry not found' });
-    res.json({ id: snapshot.id, ...snapshot.data() });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch partner entry', details: error instanceof Error ? error.message : null });
-  }
+// DELETE: Single Product
+router.delete('/products/:id', async (req: Request, res: Response) => {
+    try {
+        await productRef.doc(req.params.id).delete();
+        res.status(204).end();
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-router.delete('/partner-entries/:id', async (req, res) => {
-  try {
-    await db.collection('partnerEntries').doc(req.params.id).delete();
-    res.status(204).end();
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete partner entry', details: error instanceof Error ? error.message : null });
-  }
-});
+// DELETE: Bulk Delete (deleteAllWithId)
+router.delete('/products/bulk', async (req: Request, res: Response) => {
+    try {
+        const { ids } = req.body as { ids: string[] };
+        if (!Array.isArray(ids)) return res.status(400).json({ error: 'IDs must be an array' });
 
-router.get('/stock-entries', async (req, res) => {
-  try {
-    const limit = Number(req.query.limit || 20);
-    const snapshot = await db.collection('stockEntries').limit(limit).get();
-    res.json({ data: toJson(snapshot) });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch stock entries', details: error instanceof Error ? error.message : null });
-  }
-});
+        const batch = db.batch();
+        ids.forEach(id => {
+            batch.delete(productRef.doc(id));
+        });
 
-router.post('/stock-entries', async (req, res) => {
-  try {
-    const docRef = await db.collection('stockEntries').add({
-      ...req.body,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    const snapshot = await docRef.get();
-    res.status(201).json({ id: docRef.id, ...snapshot.data() });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create stock entry', details: error instanceof Error ? error.message : null });
-  }
-});
-
-router.get('/stock-entries/:id', async (req, res) => {
-  try {
-    const snapshot = await db.collection('stockEntries').doc(req.params.id).get();
-    if (!snapshot.exists) return res.status(404).json({ error: 'Stock entry not found' });
-    res.json({ id: snapshot.id, ...snapshot.data() });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch stock entry', details: error instanceof Error ? error.message : null });
-  }
-});
-
-router.put('/stock-entries/:id', async (req, res) => {
-  try {
-    const docRef = db.collection('stockEntries').doc(req.params.id);
-    const snapshot = await docRef.get();
-    if (!snapshot.exists) return res.status(404).json({ error: 'Stock entry not found' });
-
-    await docRef.update({ ...req.body, updatedAt: serverTimestamp() });
-    const updated = await docRef.get();
-    res.json({ id: updated.id, ...updated.data() });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update stock entry', details: error instanceof Error ? error.message : null });
-  }
-});
-
-router.delete('/stock-entries/:id', async (req, res) => {
-  try {
-    await db.collection('stockEntries').doc(req.params.id).delete();
-    res.status(204).end();
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete stock entry', details: error instanceof Error ? error.message : null });
-  }
+        await batch.commit();
+        res.status(204).end();
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 export default router;

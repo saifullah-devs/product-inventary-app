@@ -1,10 +1,8 @@
-import 'dart:convert';
+import 'package:sqflite/sqflite.dart';
 import 'package:product_inventary_app/core/error/exceptions.dart';
 import 'package:product_inventary_app/database/database_helper.dart';
-import 'package:sqflite/sqflite.dart';
 
 import '../models/product_model.dart';
-import '../models/product_variant_model.dart';
 import 'product_data_source.dart';
 
 class SqfliteProductDataSource implements IProductDataSource {
@@ -26,121 +24,34 @@ class SqfliteProductDataSource implements IProductDataSource {
       throw CacheException();
     }
 
-    final pMap = productMaps.first;
-
-    final List<Map<String, dynamic>> variantMaps = await db.query(
-      DatabaseHelper.tableVariants,
-      where: 'product_id = ?',
-      whereArgs: [id],
-    );
-
-    final variants = variantMaps
-        .map(
-          (v) => ProductVariantModel(
-            id: v['id'],
-            sku: v['sku'],
-            price: v['price'],
-            comparePrice: v['compare_price'],
-            stockQuantity: v['stock_quantity'],
-            // Attributes are stored as a JSON string in SQflite
-            attributes: Map<String, String>.from(jsonDecode(v['attributes'])),
-          ),
-        )
-        .toList();
-
-    return ProductModel(
-      id: pMap['id'],
-      name: pMap['name'],
-      description: pMap['description'],
-      category: pMap['category'],
-      basePrice: pMap['base_price'],
-      baseComparePrice: pMap['base_compare_price'],
-      images: (pMap['images'] as String).split(','),
-      variants: variants,
-    );
+    return ProductModel.fromJson(productMaps.first);
   }
 
   @override
-  Future<List<ProductModel>> getAllProducts() async {
+  Future<List<ProductModel>> getAllProducts({
+    required int limit,
+    required int offset,
+  }) async {
     final db = await dbHelper.database;
 
-    // Fetch all products
     final List<Map<String, dynamic>> productMaps = await db.query(
       DatabaseHelper.tableProducts,
+      limit: limit,
+      offset: offset,
     );
 
-    List<ProductModel> products = [];
-
-    for (var pMap in productMaps) {
-      // Fetch variants for each product
-      final List<Map<String, dynamic>> variantMaps = await db.query(
-        DatabaseHelper.tableVariants,
-        where: 'product_id = ?',
-        whereArgs: [pMap['id']],
-      );
-
-      final variants = variantMaps
-          .map(
-            (v) => ProductVariantModel(
-              id: v['id'],
-              sku: v['sku'],
-              price: v['price'],
-              comparePrice: v['compare_price'],
-              stockQuantity: v['stock_quantity'],
-              attributes: Map<String, String>.from(jsonDecode(v['attributes'])),
-            ),
-          )
-          .toList();
-
-      products.add(
-        ProductModel(
-          id: pMap['id'],
-          name: pMap['name'],
-          description: pMap['description'],
-          category: pMap['category'],
-          basePrice: pMap['base_price'],
-          baseComparePrice: pMap['base_compare_price'],
-          images: (pMap['images'] as String).split(','),
-          variants: variants,
-        ),
-      );
-    }
-    return products;
+    return productMaps.map((map) => ProductModel.fromJson(map)).toList();
   }
 
   @override
   Future<void> addProduct(ProductModel product) async {
     final db = await dbHelper.database;
 
-    await db.transaction((txn) async {
-      // 1. Insert Product
-      await txn.insert(DatabaseHelper.tableProducts, {
-        'id': product.id,
-        'name': product.name,
-        'description': product.description,
-        'category': product.category,
-        'base_price': product.basePrice,
-        'base_compare_price': product.baseComparePrice,
-        'images': product.images.join(','),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-
-      // 2. Insert Variants
-      for (var variant in product.variants) {
-        await txn.insert(
-          DatabaseHelper.tableVariants,
-          {
-            'id': variant.id,
-            'product_id': product.id,
-            'sku': variant.sku,
-            'price': variant.price,
-            'compare_price': variant.comparePrice,
-            'stock_quantity': variant.stockQuantity,
-            'attributes': jsonEncode(variant.attributes),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-    });
+    await db.insert(
+      DatabaseHelper.tableProducts,
+      product.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   @override
@@ -154,17 +65,35 @@ class SqfliteProductDataSource implements IProductDataSource {
   }
 
   @override
-  Future<void> deleteAll() async {
+  Future<void> deleteAllWithId(List<String> ids) async {
+    if (ids.isEmpty) {
+      return;
+    }
     final db = await dbHelper.database;
-    await db.delete(DatabaseHelper.tableProducts);
-    await db.delete(DatabaseHelper.tableVariants);
+
+    // Dynamically generate the correct number of placeholders (e.g., "?, ?, ?")
+    final placeholders = List.filled(ids.length, '?').join(',');
+
+    await db.delete(
+      DatabaseHelper.tableProducts,
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
   }
 
   @override
   Future<void> addAll(List<ProductModel> products) async {
+    final db = await dbHelper.database;
+
+    Batch batch = db.batch();
     for (var product in products) {
-      await addProduct(product);
+      batch.insert(
+        DatabaseHelper.tableProducts,
+        product.toJson(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     }
+    await batch.commit(noResult: true);
   }
 
   @override

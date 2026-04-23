@@ -6,6 +6,7 @@ import 'data/repositories/product_repository_impl.dart';
 import 'domain/repositories/product_repository.dart';
 import 'domain/usecases/create_product_usecase.dart';
 import 'domain/usecases/delete_product_usecase.dart';
+import 'domain/usecases/delete_products_by_id.dart';
 import 'domain/usecases/get_active_source_usecase.dart';
 import 'domain/usecases/get_all_products_usecase.dart';
 import 'domain/usecases/get_products_usecase.dart';
@@ -26,6 +27,7 @@ Future<void> init(GetIt sl) async {
       setActiveSource: sl(),
       getActiveSource: sl(),
       transferProductData: sl(),
+      deleteProductsById: sl(),
     ),
   );
   // --- Use Cases ---
@@ -34,9 +36,12 @@ Future<void> init(GetIt sl) async {
   sl.registerLazySingleton(() => CreateProductUseCase(sl()));
   sl.registerLazySingleton(() => UpdateProductUseCase(sl()));
   sl.registerLazySingleton(() => DeleteProductUseCase(sl()));
-  sl.registerLazySingleton(() => SetActiveSourceUseCase(sl()));
-  sl.registerLazySingleton(() => GetActiveSourceUseCase(sl()));
-  sl.registerLazySingleton(() => TransferProductDataUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteProductsByIdUseCase(sl()));
+
+  // Source Management & Migration
+  sl.registerLazySingleton(() => SetActiveDataSourceUseCase(sl()));
+  sl.registerLazySingleton(() => GetActiveDataSourceUseCase(sl()));
+  sl.registerLazySingleton(() => TransferDataUseCase(sl()));
 
   // --- Repository ---
   sl.registerLazySingleton<ProductRepository>(

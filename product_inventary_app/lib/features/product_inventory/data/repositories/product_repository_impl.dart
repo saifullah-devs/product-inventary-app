@@ -21,7 +21,6 @@ class ProductRepositoryImpl implements ProductRepository {
     required this.localPrefs,
   });
 
-  /// Internal helper to resolve the Strategy based on current selection
   Future<IProductDataSource> _getDataSourceByType(DataSourceType type) async {
     switch (type) {
       case DataSourceType.rest:
@@ -40,12 +39,17 @@ class ProductRepositoryImpl implements ProductRepository {
   }
 
   // --- CRUD Operations ---
-
   @override
-  Future<Either<Failure, List<Product>>> getAllProducts() async {
+  Future<Either<Failure, List<Product>>> getAllProducts({
+    required int limit,
+    required int offset,
+  }) async {
     try {
       final dataSource = await _getActiveDataSource();
-      final models = await dataSource.getAllProducts();
+      final models = await dataSource.getAllProducts(
+        limit: limit,
+        offset: offset,
+      );
       return Right(models);
     } catch (e) {
       return Left(_handleException(e));
@@ -96,6 +100,17 @@ class ProductRepositoryImpl implements ProductRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, void>> deleteProductsbyID(List<String> ids) async {
+    try {
+      final dataSource = await _getActiveDataSource();
+      await dataSource.deleteAllWithId(ids);
+      return const Right(null);
+    } catch (e) {
+      return Left(_handleException(e));
+    }
+  }
+
   // --- Source Management ---
 
   @override
@@ -118,23 +133,28 @@ class ProductRepositoryImpl implements ProductRepository {
   }
 
   // --- Data Migration (Cross-Source Transfer) ---
-
   @override
   Future<Either<Failure, void>> transferData({
+    required List<String> productIds, // Added target IDs
     required DataSourceType from,
     required DataSourceType to,
   }) async {
     try {
+      if (productIds.isEmpty) return const Right(null);
+
       // 1. Resolve source and destination strategies
       final source = await _getDataSourceByType(from);
       final destination = await _getDataSourceByType(to);
 
-      // 2. Fetch data from source
-      final products = await source.getAllProducts();
+      // 2. Fetch targeted data from the source database
+      List<ProductModel> productsToTransfer = [];
+      for (String id in productIds) {
+        final product = await source.getProduct(id);
+        productsToTransfer.add(product);
+      }
 
-      // 3. Clear destination and push all data (Atomic transfer logic)
-      // await destination.deleteAll();
-      await destination.addAll(products);
+      // 3. Push the targeted data to the destination via atomic bulk insert
+      await destination.addAll(productsToTransfer);
 
       return const Right(null);
     } catch (e) {

@@ -3,10 +3,9 @@ import 'package:path/path.dart';
 
 class DatabaseHelper {
   static const _dbName = 'app_database.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
 
   static const tableProducts = 'products';
-  static const tableVariants = 'product_variants';
 
   static Database? _database;
 
@@ -16,42 +15,37 @@ class DatabaseHelper {
     return _database!;
   }
 
-  _initDatabase() async {
+  Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), _dbName);
     return await openDatabase(
       path,
       version: _dbVersion,
       onCreate: _onCreate,
-      onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
+      onUpgrade: _onUpgrade,
     );
   }
 
   Future _onCreate(Database db, int version) async {
-    // Products Table
     await db.execute('''
       CREATE TABLE $tableProducts (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        description TEXT,
-        category TEXT,
-        images TEXT, -- Stored as comma-separated strings or JSON
-        base_price REAL,
-        base_compare_price REAL
+        description TEXT NOT NULL,
+        price REAL NOT NULL,
+        compare_price REAL, -- Nullable, so no NOT NULL constraint
+        stock_quantity INTEGER NOT NULL,
+        sku TEXT NOT NULL,
+        category TEXT NOT NULL,
+        image_url TEXT NOT NULL,
+        created_at TEXT NOT NULL
       )
     ''');
+  }
 
-    // Variants Table
-    await db.execute('''
-      CREATE TABLE $tableVariants (
-        id TEXT PRIMARY KEY,
-        product_id TEXT NOT NULL,
-        sku TEXT,
-        price REAL,
-        compare_price REAL,
-        stock_quantity INTEGER,
-        attributes TEXT, -- Stored as JSON string
-        FOREIGN KEY (product_id) REFERENCES $tableProducts (id) ON DELETE CASCADE
-      )
-    ''');
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('DROP TABLE IF EXISTS $tableProducts');
+      await _onCreate(db, newVersion);
+    }
   }
 }

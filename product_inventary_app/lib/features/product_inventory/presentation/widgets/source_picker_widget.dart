@@ -19,12 +19,12 @@ class SourcePickerWidget extends StatelessWidget {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-          // _sourceTile(
-          //   context,
-          //   "REST API (Cloud)",
-          //   Icons.cloud,
-          //   DataSourceType.rest,
-          // ),
+          _sourceTile(
+            context,
+            "REST API (Cloud)",
+            Icons.cloud,
+            DataSourceType.rest,
+          ),
           _sourceTile(
             context,
             "SQflite (Relational)",
