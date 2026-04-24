@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:product_inventary_app/core/constants/data_source_type.dart';
+import 'package:product_inventary_app/core/theme/app_colors.dart';
 
 class InventoryHeader extends StatelessWidget {
   final DataSourceType activeSource;
@@ -48,11 +49,11 @@ class InventoryHeader extends StatelessWidget {
   Color _getSourceColor(DataSourceType type) {
     switch (type) {
       case DataSourceType.rest:
-        return Colors.blue;
+        return AppColors.restSource;
       case DataSourceType.sqflite:
-        return Colors.orange;
+        return AppColors.sqfliteSource;
       case DataSourceType.hive:
-        return Colors.purple;
+        return AppColors.hiveSource;
     }
   }
 }

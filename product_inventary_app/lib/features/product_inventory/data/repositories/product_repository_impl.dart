@@ -135,7 +135,7 @@ class ProductRepositoryImpl implements ProductRepository {
   // --- Data Migration (Cross-Source Transfer) ---
   @override
   Future<Either<Failure, void>> transferData({
-    required List<String> productIds, // Added target IDs
+    required List<String> productIds,
     required DataSourceType from,
     required DataSourceType to,
   }) async {

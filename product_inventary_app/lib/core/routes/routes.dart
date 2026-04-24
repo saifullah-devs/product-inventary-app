@@ -19,13 +19,21 @@ class AppRoutes {
             child: const ProductListPage(),
           ),
         );
-
       case RoutesName.createProduct:
-        final bloc = settings.arguments as ProductBloc;
-
         return MaterialPageRoute(
-          builder: (_) =>
-              BlocProvider.value(value: bloc, child: const CreateProductPage()),
+          builder: (_) => BlocProvider(
+            create: (_) => sl<ProductBloc>(),
+            child: const CreateProductPage(),
+          ),
+        );
+
+      case RoutesName.updateProduct:
+        final productId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => sl<ProductBloc>(),
+            child: UpdateProductPage(productId: productId),
+          ),
         );
 
       case RoutesName.productDetail:
@@ -38,14 +46,6 @@ class AppRoutes {
           ),
         );
 
-      case RoutesName.updateProduct:
-        final productId = settings.arguments as String;
-        return MaterialPageRoute(
-          builder: (_) => BlocProvider(
-            create: (_) => sl<ProductBloc>(),
-            child: UpdateProductPage(productId: productId),
-          ),
-        );
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(

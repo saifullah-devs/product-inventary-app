@@ -22,8 +22,8 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
   final _categoryController = TextEditingController();
   final _skuController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _imageUrlController = TextEditingController();
   final _priceController = TextEditingController();
+  final _imageUrlController = TextEditingController();
   final _comparePriceController = TextEditingController();
   final _stockController = TextEditingController();
 
@@ -38,6 +38,7 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
 
   bool _isSubmitting = false;
   bool _isInitialized = false;
+
   Product? _originalProduct;
 
   @override
@@ -52,7 +53,6 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
     _categoryController.dispose();
     _skuController.dispose();
     _descriptionController.dispose();
-    _imageUrlController.dispose();
     _priceController.dispose();
     _comparePriceController.dispose();
     _stockController.dispose();
@@ -60,7 +60,6 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
     _categoryFocus.dispose();
     _skuFocus.dispose();
     _descFocus.dispose();
-    _imageUrlFocus.dispose();
     _priceFocus.dispose();
     _comparePriceFocus.dispose();
     _stockFocus.dispose();
@@ -189,6 +188,7 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
       child: ListView(
         padding: const EdgeInsets.all(24.0),
         children: [
+          const SizedBox(height: 24),
           TextFormField(
             controller: _nameController,
             textInputAction: TextInputAction.next,
@@ -246,24 +246,6 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
           const SizedBox(height: 16),
 
           TextFormField(
-            controller: _descriptionController,
-            focusNode: _descFocus,
-            textInputAction: TextInputAction.next,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Description',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.description_outlined),
-              alignLabelWithHint: true,
-            ),
-            validator: (value) =>
-                value == null || value.trim().isEmpty ? 'Required' : null,
-            onFieldSubmitted: (_) =>
-                FocusScope.of(context).requestFocus(_imageUrlFocus),
-          ),
-          const SizedBox(height: 16),
-
-          TextFormField(
             controller: _imageUrlController,
             focusNode: _imageUrlFocus,
             textInputAction: TextInputAction.next,
@@ -273,8 +255,6 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.image_outlined),
             ),
-            validator: (value) =>
-                value == null || value.trim().isEmpty ? 'Required' : null,
             onFieldSubmitted: (_) =>
                 FocusScope.of(context).requestFocus(_priceFocus),
           ),
@@ -356,6 +336,24 @@ class _UpdateProductPageState extends State<UpdateProductPage> {
             validator: (value) =>
                 value == null || value.trim().isEmpty ? 'Required' : null,
             onFieldSubmitted: (_) => _submitForm(),
+          ),
+          const SizedBox(height: 16),
+
+          TextFormField(
+            controller: _descriptionController,
+            focusNode: _descFocus,
+            textInputAction: TextInputAction.next,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Description',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.description_outlined),
+              alignLabelWithHint: true,
+            ),
+            validator: (value) =>
+                value == null || value.trim().isEmpty ? 'Required' : null,
+            onFieldSubmitted: (_) =>
+                FocusScope.of(context).requestFocus(_descFocus),
           ),
           const SizedBox(height: 32),
 

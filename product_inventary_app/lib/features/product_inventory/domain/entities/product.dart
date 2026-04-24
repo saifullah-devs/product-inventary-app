@@ -5,11 +5,11 @@ class Product extends Equatable {
   final String name;
   final String description;
   final double price;
-  final double? comparePrice; // Nullable: Only exists if there's a discount/RRP
+  final double? comparePrice;
   final int stockQuantity;
-  final String sku; // Stock Keeping Unit (e.g., "TSHIRT-BLK-M")
+  final String sku;
   final String category;
-  final String imageUrl; // Single image representation
+  final String imageUrl;
   final DateTime createdAt;
 
   const Product({

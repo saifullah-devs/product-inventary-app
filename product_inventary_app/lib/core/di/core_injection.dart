@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart' as path_provider;
 import 'package:hive/hive.dart';
 import '../shared_preferences/app_preferences.dart';
-import '../../database/database_helper.dart';
+import '../database/database_helper.dart';
 import '../network/network_service.dart';
 
 Future<void> init(GetIt sl) async {
@@ -23,6 +23,5 @@ Future<void> init(GetIt sl) async {
   // --- Core ---
   sl.registerLazySingleton(() => AppPreferences(sl()));
   sl.registerLazySingleton(() => DatabaseHelper());
-
   sl.registerLazySingleton(() => NetworkClient(sl()));
 }

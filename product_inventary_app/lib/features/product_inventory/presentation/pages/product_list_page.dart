@@ -18,6 +18,7 @@ class ProductListPage extends StatefulWidget {
 
 class _ProductListPageState extends State<ProductListPage> {
   final ScrollController _scrollController = ScrollController();
+  bool _isFetchingUI = false;
 
   // --- Selection State ---
   final Set<String> _selectedIds = {};
@@ -38,12 +39,13 @@ class _ProductListPageState extends State<ProductListPage> {
   }
 
   void _onScroll() {
-    if (_isBottom) {
-      // Check the current state before blasting the BLoC
+    if (_isBottom && !_isFetchingUI) {
       final currentState = context.read<ProductBloc>().state;
       if (currentState is ProductsLoaded) {
-        // Only ask for more if we aren't already asking, and haven't hit the end
         if (!currentState.isFetchingMore && !currentState.hasReachedMax) {
+          // LOCK THE UI SYNCHRONOUSLY
+          _isFetchingUI = true;
+
           context.read<ProductBloc>().add(const LoadAllProductsEvent());
         }
       }
@@ -77,7 +79,14 @@ class _ProductListPageState extends State<ProductListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: BlocBuilder<ProductBloc, ProductState>(
+      body: BlocConsumer<ProductBloc, ProductState>(
+        listener: (context, state) {
+          if (state is ProductsLoaded) {
+            _isFetchingUI = state.isFetchingMore;
+          } else if (state is ProductError) {
+            _isFetchingUI = false;
+          }
+        },
         builder: (context, state) {
           if (state is ProductInitial || state is SourceSelectionRequired) {
             return const Center(child: SourcePickerWidget());
@@ -127,11 +136,21 @@ class _ProductListPageState extends State<ProductListPage> {
                     arguments: product.id,
                   ),
                   onDelete: (product) => _confirmDelete(context, product),
-                  onEdit: (product) => Navigator.pushNamed(
-                    context,
-                    RoutesName.updateProduct,
-                    arguments: product.id,
-                  ),
+                  onEdit: (product) async {
+                    // 1. Await the navigation
+                    final shouldRefresh = await Navigator.pushNamed(
+                      context,
+                      RoutesName.updateProduct,
+                      arguments: product.id,
+                    );
+
+                    // 2. If the page returns 'true', refresh the list
+                    if (shouldRefresh == true && context.mounted) {
+                      context.read<ProductBloc>().add(
+                        const LoadAllProductsEvent(isRefresh: true),
+                      );
+                    }
+                  },
                 ),
             ],
           );
@@ -143,12 +162,19 @@ class _ProductListPageState extends State<ProductListPage> {
           ? null
           : FloatingActionButton(
               child: const Icon(Icons.add),
-              onPressed: () {
-                Navigator.pushNamed(
+              onPressed: () async {
+                // 1. Await the navigation
+                final shouldRefresh = await Navigator.pushNamed(
                   context,
                   RoutesName.createProduct,
-                  arguments: context.read<ProductBloc>(),
                 );
+
+                // 2. If the page returns 'true', refresh the list
+                if (shouldRefresh == true && context.mounted) {
+                  context.read<ProductBloc>().add(
+                    const LoadAllProductsEvent(isRefresh: true),
+                  );
+                }
               },
             ),
 

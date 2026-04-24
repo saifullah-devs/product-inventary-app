@@ -19,6 +19,7 @@ class ProductLoading extends ProductState {
 
 class ProductsLoaded extends ProductState {
   final List<Product> products;
+
   final bool hasReachedMax;
   final bool isFetchingMore;
 

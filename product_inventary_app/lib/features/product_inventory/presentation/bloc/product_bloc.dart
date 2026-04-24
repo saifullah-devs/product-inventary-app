@@ -27,7 +27,6 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   final SetActiveDataSourceUseCase setActiveSource;
   final GetActiveDataSourceUseCase getActiveSource;
   final TransferDataUseCase transferProductData;
-
   static const int _limit = 15;
 
   ProductBloc({
@@ -41,9 +40,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     required this.getActiveSource,
     required this.transferProductData,
   }) : super(ProductInitial()) {
-    // HELPER: Grabs the active source from the current state or fetches it
+    // HELPER: Fetch it fresh every time!
     Future<DataSourceType?> _getCurrentSource() async {
-      if (state.activeSource != null) return state.activeSource;
       final result = await getActiveSource(NoParams());
       return result.fold((l) => null, (r) => r);
     }
@@ -61,6 +59,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
     on<SelectSourceEvent>((event, emit) async {
       await setActiveSource(event.type);
+      emit(ProductLoading(activeSource: event.type));
       add(const LoadAllProductsEvent(isRefresh: true));
     });
 

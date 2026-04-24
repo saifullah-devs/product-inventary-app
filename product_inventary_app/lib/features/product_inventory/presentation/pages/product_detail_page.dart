@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:product_inventary_app/core/routes/routes_name.dart';
 
 import '../bloc/product_bloc.dart';
 import '../../domain/entities/product.dart';
@@ -38,11 +39,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   const Icon(Icons.error_outline, size: 48, color: Colors.red),
                   const SizedBox(height: 16),
                   Text(state.message),
-                  TextButton(
-                    onPressed: () => context.read<ProductBloc>().add(
-                      GetProductDetailEvent(widget.productId),
-                    ),
-                    child: const Text('Retry'),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => context.read<ProductBloc>().add(
+                          GetProductDetailEvent(widget.productId),
+                        ),
+                        child: const Text('Refresh'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Return'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -59,19 +68,17 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
-  // Extracted the UI logic here to keep the build method clean
   Widget _buildDetailContent(BuildContext context, Product product) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
     final currencyFormat = NumberFormat.currency(
-      symbol: '\$',
+      symbol: 'PKR',
       decimalDigits: 2,
     );
     final dateFormat = DateFormat.yMMMMd().add_jm();
 
-    // Check if there is an active discount
     final hasDiscount =
         product.comparePrice != null && product.comparePrice! > product.price;
 
@@ -81,13 +88,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           child: CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight:
-                    300.0, // Slightly taller to accommodate real images beautifully
+                expandedHeight: 300.0,
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     color: colorScheme.surfaceContainerHighest,
-                    // Hero widget matches the one in the ProductCard
                     child: Hero(
                       tag: 'product_icon_${product.id}',
                       child: product.imageUrl.isNotEmpty
@@ -159,23 +164,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            currencyFormat.format(product.price),
-                            style: textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: hasDiscount
-                                  ? colorScheme.error
-                                  : colorScheme.primary,
+                          Expanded(
+                            child: Text(
+                              currencyFormat.format(product.price),
+                              style: textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                           if (hasDiscount) ...[
                             const SizedBox(width: 12),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 6.0),
+                            Expanded(
                               child: Text(
                                 currencyFormat.format(product.comparePrice),
-                                style: textTheme.headlineSmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
+                                style: textTheme.headlineMedium?.copyWith(
+                                  color: hasDiscount
+                                      ? colorScheme.error
+                                      : colorScheme.primary,
                                   decoration: TextDecoration.lineThrough,
                                 ),
                               ),
@@ -233,9 +239,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         label: 'Created At',
                         value: dateFormat.format(product.createdAt),
                       ),
-                      const SizedBox(
-                        height: 40,
-                      ), // Extra padding for scroll clearance
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -262,8 +266,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
               const Spacer(),
               FilledButton.icon(
-                onPressed: () {
-                  // Navigate to Edit page
+                onPressed: () async {
+                  // 1. Await the navigation
+                  final shouldRefresh = await Navigator.pushNamed(
+                    context,
+                    RoutesName.updateProduct,
+                    arguments: product.id,
+                  );
+
+                  // 2. If the page returns 'true', refresh the list
+                  if (shouldRefresh == true && context.mounted) {
+                    context.read<ProductBloc>().add(
+                      const LoadAllProductsEvent(isRefresh: true),
+                    );
+                  }
                 },
                 icon: const Icon(Icons.edit_outlined),
                 label: const Text('Edit Product'),

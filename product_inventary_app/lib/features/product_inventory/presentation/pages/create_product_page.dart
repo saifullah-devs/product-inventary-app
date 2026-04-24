@@ -182,25 +182,6 @@ class _CreateProductPageState extends State<CreateProductPage> {
               ),
               const SizedBox(height: 16),
 
-              // --- Description ---
-              TextFormField(
-                controller: _descriptionController,
-                focusNode: _descFocus,
-                textInputAction: TextInputAction.next,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.description_outlined),
-                  alignLabelWithHint: true,
-                ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? 'Required' : null,
-                onFieldSubmitted: (_) =>
-                    FocusScope.of(context).requestFocus(_imageUrlFocus),
-              ),
-              const SizedBox(height: 16),
-
               // --- Image URL ---
               TextFormField(
                 controller: _imageUrlController,
@@ -301,6 +282,25 @@ class _CreateProductPageState extends State<CreateProductPage> {
                 validator: (value) =>
                     value == null || value.trim().isEmpty ? 'Required' : null,
                 onFieldSubmitted: (_) => _submitForm(),
+              ),
+              const SizedBox(height: 16),
+
+              // --- Description ---
+              TextFormField(
+                controller: _descriptionController,
+                focusNode: _descFocus,
+                textInputAction: TextInputAction.next,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description_outlined),
+                  alignLabelWithHint: true,
+                ),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Required' : null,
+                onFieldSubmitted: (_) =>
+                    FocusScope.of(context).requestFocus(_imageUrlFocus),
               ),
               const SizedBox(height: 32),
 

@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:product_inventary_app/core/error/exceptions.dart';
-import 'package:product_inventary_app/database/database_helper.dart';
+import 'package:product_inventary_app/core/database/database_helper.dart';
 
 import '../models/product_model.dart';
 import 'product_data_source.dart';
